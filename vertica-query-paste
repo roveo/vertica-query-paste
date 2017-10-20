@@ -1,0 +1,49 @@
+#!/bin/bash
+
+
+# Determining paste utility
+if which pbpaste > /dev/null 2>&1
+then
+    paste=$(which pbpaste)
+elif which xclip > /dev/null 2>&1
+then
+    paste="$(which xclip) -selection clipboard -o"
+else
+    echo "No clipboard utility found! Can't paste anything." 1>&2
+    exit 1
+fi
+
+
+# Finding vsql
+if which vsql > /dev/null 2>&1  # check $PATH
+then
+    vsql=$(which vsql)
+elif [ -e /opt/vertica/bin/vsql ]  # check default location
+then
+    vsql=/opt/vertica/bin/vsql
+else
+    echo "vsql not found!" 1>&2
+    exit 2
+fi
+
+
+# Determining environment variables
+env=$1
+if [ -n "$env" ]
+then
+    host=VSQL_HOST_${env}; VSQL_HOST=${!host:-$VSQL_HOST}
+    port=VSQL_PORT_${env}; VSQL_PORT=${!port:-$VSQL_PORT}
+    pass=VSQL_PASSWORD_${env}; VSQL_PASSWORD=${!pass:-$VSQL_PASSWORD}
+fi
+
+
+# Delimiter
+delimiter=${2:-,}
+
+
+# execute
+tmp=$(mktemp)
+$paste > $tmp
+$vsql -q -v AUTOCOMMIT=on -P footer=off -f $tmp -A -F $delimiter
+rm $tmp
+
